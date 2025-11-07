@@ -249,34 +249,22 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Ensure connection is decremented when this function returns
 	defer s.validator.DecrementConnection(user.Email)
 
-	// Apply rate limiting based on network type
-	if destination.Network == net.Network_UDP {
-		// For UDP, wrap the connection at io.ReadWriteCloser level
-		var rateLimitedConn io.ReadWriteCloser = conn
-		if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
-			rateLimitedConn = ratelimit.NewRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
-			if account.MaxUploadSpeed > 0 {
-				errors.LogInfo(ctx, "Applied UDP upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
-			}
-			if account.MaxDownloadSpeed > 0 {
-				errors.LogInfo(ctx, "Applied UDP download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
-			}
+	// Apply rate limiting at connection level if configured
+	var rateLimitedConn io.ReadWriteCloser = conn
+	if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
+		rateLimitedConn = ratelimit.NewRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
+		// Update the buffered reader to use rate-limited connection for subsequent reads
+		bufferedReader.Reader = buf.NewReader(rateLimitedConn)
+		if account.MaxUploadSpeed > 0 {
+			errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
 		}
+		if account.MaxDownloadSpeed > 0 {
+			errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
+		}
+	}
+
+	if destination.Network == net.Network_UDP { // handle udp request
 		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: rateLimitedConn}, dispatcher)
-	}
-
-	// For TCP, wrap at buf.Reader/buf.Writer level
-	var reader buf.Reader = clientReader
-	var writer buf.Writer = buf.NewWriter(conn)
-
-	if account.MaxUploadSpeed > 0 {
-		reader = ratelimit.NewRateLimitedReader(reader, account.MaxUploadSpeed)
-		errors.LogInfo(ctx, "Applied TCP upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
-	}
-
-	if account.MaxDownloadSpeed > 0 {
-		writer = ratelimit.NewRateLimitedWriter(writer, account.MaxDownloadSpeed)
-		errors.LogInfo(ctx, "Applied TCP download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
 	}
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
@@ -288,7 +276,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, reader, writer, dispatcher)
+	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(rateLimitedConn), dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {
