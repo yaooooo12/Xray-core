@@ -130,29 +130,31 @@ func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int6
 	}
 
 	if uploadSpeed > 0 {
-		// Use a reasonable burst size (min 4KB, max 128KB)
-		// Cap the speed to prevent overflow when converting to int
-		cappedSpeed := uploadSpeed
-		if cappedSpeed > 131072 {
-			cappedSpeed = 131072
-		}
-		burstSize := int(cappedSpeed)
+		// Burst size should be reasonable: use 1 second worth of data
+		// but cap at reasonable limits to prevent overflow
+		burstSize := int(uploadSpeed)
+		// Ensure burst is at least 4KB for small speeds
 		if burstSize < 4096 {
-			burstSize = 4096 // Min 4KB
+			burstSize = 4096
+		}
+		// Cap at 10MB to prevent int overflow and keep memory usage reasonable
+		if burstSize > 10485760 {
+			burstSize = 10485760
 		}
 		rlConn.readLimiter = rate.NewLimiter(rate.Limit(uploadSpeed), burstSize)
 	}
 
 	if downloadSpeed > 0 {
-		// Use a reasonable burst size (min 4KB, max 128KB)
-		// Cap the speed to prevent overflow when converting to int
-		cappedSpeed := downloadSpeed
-		if cappedSpeed > 131072 {
-			cappedSpeed = 131072
-		}
-		burstSize := int(cappedSpeed)
+		// Burst size should be reasonable: use 1 second worth of data
+		// but cap at reasonable limits to prevent overflow
+		burstSize := int(downloadSpeed)
+		// Ensure burst is at least 4KB for small speeds
 		if burstSize < 4096 {
-			burstSize = 4096 // Min 4KB
+			burstSize = 4096
+		}
+		// Cap at 10MB to prevent int overflow and keep memory usage reasonable
+		if burstSize > 10485760 {
+			burstSize = 10485760
 		}
 		rlConn.writeLimiter = rate.NewLimiter(rate.Limit(downloadSpeed), burstSize)
 	}
