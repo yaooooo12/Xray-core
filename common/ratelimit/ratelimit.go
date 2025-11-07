@@ -129,11 +129,21 @@ func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int6
 	}
 
 	if uploadSpeed > 0 {
-		rlConn.readLimiter = rate.NewLimiter(rate.Limit(uploadSpeed), int(uploadSpeed))
+		// Use a reasonable burst size (1 second worth of data or max 128KB)
+		burstSize := int(uploadSpeed)
+		if burstSize > 131072 {
+			burstSize = 131072 // Cap at 128KB
+		}
+		rlConn.readLimiter = rate.NewLimiter(rate.Limit(uploadSpeed), burstSize)
 	}
 
 	if downloadSpeed > 0 {
-		rlConn.writeLimiter = rate.NewLimiter(rate.Limit(downloadSpeed), int(downloadSpeed))
+		// Use a reasonable burst size (1 second worth of data or max 128KB)
+		burstSize := int(downloadSpeed)
+		if burstSize > 131072 {
+			burstSize = 131072 // Cap at 128KB
+		}
+		rlConn.writeLimiter = rate.NewLimiter(rate.Limit(downloadSpeed), burstSize)
 	}
 
 	return rlConn
@@ -141,52 +151,34 @@ func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int6
 
 // Read implements io.Reader with upload rate limiting
 func (c *RateLimitedConn) Read(p []byte) (n int, err error) {
-	if c.readLimiter != nil {
-		// Wait for permission to read
-		ctx := context.Background()
-		maxRead := len(p)
-		if maxRead > int(c.uploadSpeed) {
-			maxRead = int(c.uploadSpeed)
-		}
+	// First, do the actual read
+	n, err = c.conn.Read(p)
+	if err != nil || n == 0 {
+		return n, err
+	}
 
-		reservation := c.readLimiter.ReserveN(time.Now(), maxRead)
-		if !reservation.OK() {
-			delay := reservation.Delay()
-			if delay > 0 {
-				timer := time.NewTimer(delay)
-				select {
-				case <-timer.C:
-				case <-ctx.Done():
-					timer.Stop()
-					return 0, ctx.Err()
-				}
-			}
+	// Then apply rate limiting based on bytes actually read
+	if c.readLimiter != nil && n > 0 {
+		ctx := context.Background()
+		// Wait for tokens based on actual bytes read
+		waitErr := c.readLimiter.WaitN(ctx, n)
+		if waitErr != nil {
+			return n, waitErr
 		}
 	}
 
-	n, err = c.conn.Read(p)
 	return n, err
 }
 
 // Write implements io.Writer with download rate limiting
 func (c *RateLimitedConn) Write(p []byte) (n int, err error) {
-	if c.writeLimiter != nil {
-		// Wait for permission to write
+	// Apply rate limiting before write for download (server to client)
+	if c.writeLimiter != nil && len(p) > 0 {
 		ctx := context.Background()
-		toWrite := len(p)
-
-		reservation := c.writeLimiter.ReserveN(time.Now(), toWrite)
-		if !reservation.OK() {
-			delay := reservation.Delay()
-			if delay > 0 {
-				timer := time.NewTimer(delay)
-				select {
-				case <-timer.C:
-				case <-ctx.Done():
-					timer.Stop()
-					return 0, ctx.Err()
-				}
-			}
+		// Wait for tokens before writing
+		waitErr := c.writeLimiter.WaitN(ctx, len(p))
+		if waitErr != nil {
+			return 0, waitErr
 		}
 	}
 
