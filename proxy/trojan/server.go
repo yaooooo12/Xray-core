@@ -235,6 +235,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Check and enforce max concurrent connections limit
 	account := user.Account.(*MemoryAccount)
 	errors.LogInfo(ctx, "DEBUG: User ", user.Email, " MaxConcurrentConnections = ", account.MaxConcurrentConnections)
+	errors.LogInfo(ctx, "DEBUG: User ", user.Email, " MaxUploadSpeed = ", account.MaxUploadSpeed, " MaxDownloadSpeed = ", account.MaxDownloadSpeed)
 	if !s.validator.IncrementConnection(user.Email, account.MaxConcurrentConnections) {
 		log.Record(&log.AccessMessage{
 			From:   conn.RemoteAddr(),
