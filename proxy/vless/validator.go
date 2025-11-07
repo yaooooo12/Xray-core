@@ -16,6 +16,9 @@ type Validator interface {
 	GetByEmail(email string) *protocol.MemoryUser
 	GetAll() []*protocol.MemoryUser
 	GetCount() int64
+	IncrementConnection(email string, maxConnections int32) bool
+	DecrementConnection(email string)
+	GetActiveConnections(email string) int32
 }
 
 func ProcessUUID(id [16]byte) [16]byte {
