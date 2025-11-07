@@ -14,6 +14,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	udp_proto "github.com/xtls/xray-core/common/protocol/udp"
+	"github.com/xtls/xray-core/common/ratelimit"
 	"github.com/xtls/xray-core/common/retry"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal"
@@ -248,8 +249,21 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Ensure connection is decremented when this function returns
 	defer s.validator.DecrementConnection(user.Email)
 
+	// Apply rate limiting if configured
+	var rateLimitedReader buf.Reader = clientReader
+	var rateLimitedWriter buf.Writer = buf.NewWriter(conn)
+
+	if account.MaxUploadSpeed > 0 {
+		rateLimitedReader = ratelimit.NewRateLimitedReader(rateLimitedReader, account.MaxUploadSpeed)
+		errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
+	}
+	if account.MaxDownloadSpeed > 0 {
+		rateLimitedWriter = ratelimit.NewRateLimitedWriter(rateLimitedWriter, account.MaxDownloadSpeed)
+		errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
+	}
+
 	if destination.Network == net.Network_UDP { // handle udp request
-		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: conn}, dispatcher)
+		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: rateLimitedReader}, &PacketWriter{Writer: rateLimitedWriter}, dispatcher)
 	}
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
@@ -261,7 +275,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(conn), dispatcher)
+	return s.handleConnection(ctx, sessionPolicy, destination, rateLimitedReader, rateLimitedWriter, dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {
