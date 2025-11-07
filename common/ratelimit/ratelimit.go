@@ -22,9 +22,18 @@ func NewRateLimitedReader(reader buf.Reader, bytesPerSecond int64) buf.Reader {
 		return reader
 	}
 
+	// Calculate burst size with reasonable limits
+	burstSize := int(bytesPerSecond)
+	if burstSize < 4096 {
+		burstSize = 4096 // Min 4KB
+	}
+	if burstSize > 10485760 {
+		burstSize = 10485760 // Cap at 10MB
+	}
+
 	return &RateLimitedReader{
 		reader:  reader,
-		limiter: rate.NewLimiter(rate.Limit(bytesPerSecond), int(bytesPerSecond)),
+		limiter: rate.NewLimiter(rate.Limit(bytesPerSecond), burstSize),
 	}
 }
 
@@ -36,25 +45,14 @@ func (r *RateLimitedReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	}
 
 	// Calculate total bytes read
-	totalBytes := int64(mb.Len())
+	totalBytes := mb.Len()
 	if totalBytes > 0 {
-		// Reserve tokens from the rate limiter
-		// This will block if the rate limit is exceeded
+		// Wait for tokens from the rate limiter
 		ctx := context.Background()
-		reservation := r.limiter.ReserveN(time.Now(), int(totalBytes))
-		if !reservation.OK() {
-			// If we can't get tokens immediately, wait
-			delay := reservation.Delay()
-			if delay > 0 {
-				timer := time.NewTimer(delay)
-				select {
-				case <-timer.C:
-					// Rate limit delay completed
-				case <-ctx.Done():
-					timer.Stop()
-					return mb, ctx.Err()
-				}
-			}
+		waitErr := r.limiter.WaitN(ctx, totalBytes)
+		if waitErr != nil {
+			buf.ReleaseMulti(mb)
+			return nil, waitErr
 		}
 	}
 
@@ -74,33 +72,31 @@ func NewRateLimitedWriter(writer buf.Writer, bytesPerSecond int64) buf.Writer {
 		return writer
 	}
 
+	// Calculate burst size with reasonable limits
+	burstSize := int(bytesPerSecond)
+	if burstSize < 4096 {
+		burstSize = 4096 // Min 4KB
+	}
+	if burstSize > 10485760 {
+		burstSize = 10485760 // Cap at 10MB
+	}
+
 	return &RateLimitedWriter{
 		writer:  writer,
-		limiter: rate.NewLimiter(rate.Limit(bytesPerSecond), int(bytesPerSecond)),
+		limiter: rate.NewLimiter(rate.Limit(bytesPerSecond), burstSize),
 	}
 }
 
 // WriteMultiBuffer writes data with rate limiting
 func (w *RateLimitedWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	// Calculate total bytes to write
-	totalBytes := int64(mb.Len())
+	totalBytes := mb.Len()
 	if totalBytes > 0 {
-		// Reserve tokens from the rate limiter
+		// Wait for tokens from the rate limiter before writing
 		ctx := context.Background()
-		reservation := w.limiter.ReserveN(time.Now(), int(totalBytes))
-		if !reservation.OK() {
-			// If we can't get tokens immediately, wait
-			delay := reservation.Delay()
-			if delay > 0 {
-				timer := time.NewTimer(delay)
-				select {
-				case <-timer.C:
-					// Rate limit delay completed
-				case <-ctx.Done():
-					timer.Stop()
-					return ctx.Err()
-				}
-			}
+		waitErr := w.limiter.WaitN(ctx, totalBytes)
+		if waitErr != nil {
+			return waitErr
 		}
 	}
 
