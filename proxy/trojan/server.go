@@ -249,21 +249,20 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Ensure connection is decremented when this function returns
 	defer s.validator.DecrementConnection(user.Email)
 
-	// Apply rate limiting if configured
-	var rateLimitedReader buf.Reader = clientReader
-	var rateLimitedWriter buf.Writer = buf.NewWriter(conn)
-
-	if account.MaxUploadSpeed > 0 {
-		rateLimitedReader = ratelimit.NewRateLimitedReader(rateLimitedReader, account.MaxUploadSpeed)
-		errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
-	}
-	if account.MaxDownloadSpeed > 0 {
-		rateLimitedWriter = ratelimit.NewRateLimitedWriter(rateLimitedWriter, account.MaxDownloadSpeed)
-		errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
+	// Apply rate limiting at connection level if configured
+	var rateLimitedConn io.ReadWriteCloser = conn
+	if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
+		rateLimitedConn = ratelimit.NewRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
+		if account.MaxUploadSpeed > 0 {
+			errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
+		}
+		if account.MaxDownloadSpeed > 0 {
+			errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s for user ", user.Email)
+		}
 	}
 
 	if destination.Network == net.Network_UDP { // handle udp request
-		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: rateLimitedReader}, &PacketWriter{Writer: rateLimitedWriter}, dispatcher)
+		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: rateLimitedConn}, dispatcher)
 	}
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
@@ -275,7 +274,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, rateLimitedReader, rateLimitedWriter, dispatcher)
+	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(rateLimitedConn), dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {
