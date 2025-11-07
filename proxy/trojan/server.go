@@ -248,8 +248,29 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Ensure connection is decremented when this function returns
 	defer s.validator.DecrementConnection(user.Email)
 
-	if destination.Network == net.Network_UDP { // handle udp request
-		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: conn}, dispatcher)
+	// Apply rate limiting if configured
+	if destination.Network == net.Network_UDP {
+		// For UDP, wrap the connection
+		var writer io.Writer = conn
+		if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
+			writer = newRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
+			errors.LogInfo(ctx, "Applied rate limiting for UDP: upload=", account.MaxUploadSpeed, " download=", account.MaxDownloadSpeed)
+		}
+		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: writer}, dispatcher)
+	}
+
+	// For TCP, wrap the reader and writer
+	var reader buf.Reader = clientReader
+	var writer buf.Writer = buf.NewWriter(conn)
+
+	if account.MaxUploadSpeed > 0 {
+		reader = newRateLimitedReader(reader, account.MaxUploadSpeed)
+		errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s")
+	}
+
+	if account.MaxDownloadSpeed > 0 {
+		writer = newRateLimitedWriter(writer, account.MaxDownloadSpeed)
+		errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s")
 	}
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
@@ -261,7 +282,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(conn), dispatcher)
+	return s.handleConnection(ctx, sessionPolicy, destination, reader, writer, dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {

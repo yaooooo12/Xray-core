@@ -28,6 +28,8 @@ type Account struct {
 
 	Password                 string `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
 	MaxConcurrentConnections int32  `protobuf:"varint,2,opt,name=max_concurrent_connections,json=maxConcurrentConnections,proto3" json:"max_concurrent_connections,omitempty"`
+	MaxUploadSpeed           int64  `protobuf:"varint,3,opt,name=max_upload_speed,json=maxUploadSpeed,proto3" json:"max_upload_speed,omitempty"`
+	MaxDownloadSpeed         int64  `protobuf:"varint,4,opt,name=max_download_speed,json=maxDownloadSpeed,proto3" json:"max_download_speed,omitempty"`
 }
 
 func (x *Account) Reset() {
@@ -70,6 +72,20 @@ func (x *Account) GetPassword() string {
 func (x *Account) GetMaxConcurrentConnections() int32 {
 	if x != nil {
 		return x.MaxConcurrentConnections
+	}
+	return 0
+}
+
+func (x *Account) GetMaxUploadSpeed() int64 {
+	if x != nil {
+		return x.MaxUploadSpeed
+	}
+	return 0
+}
+
+func (x *Account) GetMaxDownloadSpeed() int64 {
+	if x != nil {
+		return x.MaxDownloadSpeed
 	}
 	return 0
 }
