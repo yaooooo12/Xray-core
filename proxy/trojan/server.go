@@ -253,6 +253,8 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	var rateLimitedConn io.ReadWriteCloser = conn
 	if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
 		rateLimitedConn = ratelimit.NewRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
+		// Update the buffered reader to use rate-limited connection for subsequent reads
+		bufferedReader.Reader = buf.NewReader(rateLimitedConn)
 		if account.MaxUploadSpeed > 0 {
 			errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s for user ", user.Email)
 		}

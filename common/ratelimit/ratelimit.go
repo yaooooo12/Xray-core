@@ -118,7 +118,8 @@ type RateLimitedConn struct {
 
 // NewRateLimitedConn creates a new rate-limited connection wrapper
 func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int64) io.ReadWriteCloser {
-	if uploadSpeed <= 0 && downloadSpeed <= 0 {
+	// Return original connection if no rate limiting needed or if conn is nil
+	if conn == nil || (uploadSpeed <= 0 && downloadSpeed <= 0) {
 		return conn
 	}
 
@@ -129,19 +130,29 @@ func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int6
 	}
 
 	if uploadSpeed > 0 {
-		// Use a reasonable burst size (1 second worth of data or max 128KB)
-		burstSize := int(uploadSpeed)
-		if burstSize > 131072 {
-			burstSize = 131072 // Cap at 128KB
+		// Use a reasonable burst size (min 4KB, max 128KB)
+		// Cap the speed to prevent overflow when converting to int
+		cappedSpeed := uploadSpeed
+		if cappedSpeed > 131072 {
+			cappedSpeed = 131072
+		}
+		burstSize := int(cappedSpeed)
+		if burstSize < 4096 {
+			burstSize = 4096 // Min 4KB
 		}
 		rlConn.readLimiter = rate.NewLimiter(rate.Limit(uploadSpeed), burstSize)
 	}
 
 	if downloadSpeed > 0 {
-		// Use a reasonable burst size (1 second worth of data or max 128KB)
-		burstSize := int(downloadSpeed)
-		if burstSize > 131072 {
-			burstSize = 131072 // Cap at 128KB
+		// Use a reasonable burst size (min 4KB, max 128KB)
+		// Cap the speed to prevent overflow when converting to int
+		cappedSpeed := downloadSpeed
+		if cappedSpeed > 131072 {
+			cappedSpeed = 131072
+		}
+		burstSize := int(cappedSpeed)
+		if burstSize < 4096 {
+			burstSize = 4096 // Min 4KB
 		}
 		rlConn.writeLimiter = rate.NewLimiter(rate.Limit(downloadSpeed), burstSize)
 	}
@@ -151,14 +162,19 @@ func NewRateLimitedConn(conn io.ReadWriteCloser, uploadSpeed, downloadSpeed int6
 
 // Read implements io.Reader with upload rate limiting
 func (c *RateLimitedConn) Read(p []byte) (n int, err error) {
+	// Safety check
+	if c == nil || c.conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	// First, do the actual read
 	n, err = c.conn.Read(p)
-	if err != nil || n == 0 {
+	if err != nil || n <= 0 {
 		return n, err
 	}
 
 	// Then apply rate limiting based on bytes actually read
-	if c.readLimiter != nil && n > 0 {
+	if c.readLimiter != nil {
 		ctx := context.Background()
 		// Wait for tokens based on actual bytes read
 		waitErr := c.readLimiter.WaitN(ctx, n)
@@ -172,6 +188,11 @@ func (c *RateLimitedConn) Read(p []byte) (n int, err error) {
 
 // Write implements io.Writer with download rate limiting
 func (c *RateLimitedConn) Write(p []byte) (n int, err error) {
+	// Safety check
+	if c == nil || c.conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	// Apply rate limiting before write for download (server to client)
 	if c.writeLimiter != nil && len(p) > 0 {
 		ctx := context.Background()
@@ -188,5 +209,8 @@ func (c *RateLimitedConn) Write(p []byte) (n int, err error) {
 
 // Close implements io.Closer
 func (c *RateLimitedConn) Close() error {
+	if c == nil || c.conn == nil {
+		return nil
+	}
 	return c.conn.Close()
 }
