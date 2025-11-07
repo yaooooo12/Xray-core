@@ -14,6 +14,9 @@ import (
 type MemoryAccount struct {
 	Password string
 	Key      []byte
+
+	// Maximum number of concurrent connections allowed for this user. 0 means unlimited.
+	MaxConcurrentConnections int32
 }
 
 // AsAccount implements protocol.AsAccount.
@@ -21,8 +24,9 @@ func (a *Account) AsAccount() (protocol.Account, error) {
 	password := a.GetPassword()
 	key := hexSha224(password)
 	return &MemoryAccount{
-		Password: password,
-		Key:      key,
+		Password:                 password,
+		Key:                      key,
+		MaxConcurrentConnections: a.MaxConcurrentConnections,
 	}, nil
 }
 
@@ -36,7 +40,8 @@ func (a *MemoryAccount) Equals(another protocol.Account) bool {
 
 func (a *MemoryAccount) ToProto() proto.Message {
 	return &Account{
-		Password: a.Password,
+		Password:                 a.Password,
+		MaxConcurrentConnections: a.MaxConcurrentConnections,
 	}
 }
 

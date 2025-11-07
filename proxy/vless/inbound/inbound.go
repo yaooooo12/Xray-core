@@ -535,6 +535,20 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 
 	account := request.User.Account.(*vless.MemoryAccount)
 
+	// Check and enforce max concurrent connections limit
+	if !h.validator.IncrementConnection(request.User.Email, account.MaxConcurrentConnections) {
+		log.Record(&log.AccessMessage{
+			From:   connection.RemoteAddr(),
+			To:     request.Destination(),
+			Status: log.AccessRejected,
+			Reason: errors.New("max concurrent connections limit reached for user: ", request.User.Email),
+			Email:  request.User.Email,
+		})
+		return errors.New("max concurrent connections limit reached for user: ", request.User.Email).AtWarning()
+	}
+	// Ensure connection is decremented when this function returns
+	defer h.validator.DecrementConnection(request.User.Email)
+
 	responseAddons := &encoding.Addons{
 		// Flow: requestAddons.Flow,
 	}

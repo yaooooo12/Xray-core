@@ -18,6 +18,9 @@ type MemoryAccount struct {
 
 	AuthenticatedLengthExperiment bool
 	NoTerminationSignal           bool
+
+	// Maximum number of concurrent connections allowed for this user. 0 means unlimited.
+	MaxConcurrentConnections int32
 }
 
 // Equals implements protocol.Account.
@@ -38,9 +41,10 @@ func (a *MemoryAccount) ToProto() proto.Message {
 		test = test + "NoTerminationSignal"
 	}
 	return &Account{
-		Id:               a.ID.String(),
-		TestsEnabled:     test,
-		SecuritySettings: &protocol.SecurityConfig{Type: a.Security},
+		Id:                       a.ID.String(),
+		TestsEnabled:             test,
+		SecuritySettings:         &protocol.SecurityConfig{Type: a.Security},
+		MaxConcurrentConnections: a.MaxConcurrentConnections,
 	}
 }
 
@@ -63,5 +67,6 @@ func (a *Account) AsAccount() (protocol.Account, error) {
 		Security:                      a.SecuritySettings.GetSecurityType(),
 		AuthenticatedLengthExperiment: AuthenticatedLength,
 		NoTerminationSignal:           NoTerminationSignal,
+		MaxConcurrentConnections:      a.MaxConcurrentConnections,
 	}, nil
 }

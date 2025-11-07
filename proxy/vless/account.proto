@@ -22,4 +22,8 @@ message Account {
   string padding = 6;
 
   Reverse reverse = 7;
+
+  // Maximum number of concurrent connections allowed for this user.
+  // 0 means unlimited (default).
+  int32 max_concurrent_connections = 8;
 }

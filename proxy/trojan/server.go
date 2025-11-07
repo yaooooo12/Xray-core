@@ -232,6 +232,21 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	inbound.User = user
 	sessionPolicy = s.policyManager.ForLevel(user.Level)
 
+	// Check and enforce max concurrent connections limit
+	account := user.Account.(*MemoryAccount)
+	if !s.validator.IncrementConnection(user.Email, account.MaxConcurrentConnections) {
+		log.Record(&log.AccessMessage{
+			From:   conn.RemoteAddr(),
+			To:     destination,
+			Status: log.AccessRejected,
+			Reason: errors.New("max concurrent connections limit reached for user: ", user.Email),
+			Email:  user.Email,
+		})
+		return errors.New("max concurrent connections limit reached for user: ", user.Email).AtWarning()
+	}
+	// Ensure connection is decremented when this function returns
+	defer s.validator.DecrementConnection(user.Email)
+
 	if destination.Network == net.Network_UDP { // handle udp request
 		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: conn}, dispatcher)
 	}

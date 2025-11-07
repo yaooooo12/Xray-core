@@ -15,13 +15,14 @@ func (a *Account) AsAccount() (protocol.Account, error) {
 		return nil, errors.New("failed to parse ID").Base(err).AtError()
 	}
 	return &MemoryAccount{
-		ID:         protocol.NewID(id),
-		Flow:       a.Flow,       // needs parser here?
-		Encryption: a.Encryption, // needs parser here?
-		XorMode:    a.XorMode,
-		Seconds:    a.Seconds,
-		Padding:    a.Padding,
-		Reverse:    a.Reverse,
+		ID:                       protocol.NewID(id),
+		Flow:                     a.Flow,       // needs parser here?
+		Encryption:               a.Encryption, // needs parser here?
+		XorMode:                  a.XorMode,
+		Seconds:                  a.Seconds,
+		Padding:                  a.Padding,
+		Reverse:                  a.Reverse,
+		MaxConcurrentConnections: a.MaxConcurrentConnections,
 	}, nil
 }
 
@@ -38,6 +39,9 @@ type MemoryAccount struct {
 	Padding    string
 
 	Reverse *Reverse
+
+	// Maximum number of concurrent connections allowed for this user. 0 means unlimited.
+	MaxConcurrentConnections int32
 }
 
 // Equals implements protocol.Account.Equals().
@@ -51,12 +55,13 @@ func (a *MemoryAccount) Equals(account protocol.Account) bool {
 
 func (a *MemoryAccount) ToProto() proto.Message {
 	return &Account{
-		Id:         a.ID.String(),
-		Flow:       a.Flow,
-		Encryption: a.Encryption,
-		XorMode:    a.XorMode,
-		Seconds:    a.Seconds,
-		Padding:    a.Padding,
-		Reverse:    a.Reverse,
+		Id:                       a.ID.String(),
+		Flow:                     a.Flow,
+		Encryption:               a.Encryption,
+		XorMode:                  a.XorMode,
+		Seconds:                  a.Seconds,
+		Padding:                  a.Padding,
+		Reverse:                  a.Reverse,
+		MaxConcurrentConnections: a.MaxConcurrentConnections,
 	}
 }

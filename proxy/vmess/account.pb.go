@@ -32,7 +32,8 @@ type Account struct {
 	// Security settings. Only applies to client side.
 	SecuritySettings *protocol.SecurityConfig `protobuf:"bytes,3,opt,name=security_settings,json=securitySettings,proto3" json:"security_settings,omitempty"`
 	// Define tests enabled for this account
-	TestsEnabled string `protobuf:"bytes,4,opt,name=tests_enabled,json=testsEnabled,proto3" json:"tests_enabled,omitempty"`
+	TestsEnabled             string `protobuf:"bytes,4,opt,name=tests_enabled,json=testsEnabled,proto3" json:"tests_enabled,omitempty"`
+	MaxConcurrentConnections int32  `protobuf:"varint,5,opt,name=max_concurrent_connections,json=maxConcurrentConnections,proto3" json:"max_concurrent_connections,omitempty"`
 }
 
 func (x *Account) Reset() {
@@ -84,6 +85,13 @@ func (x *Account) GetTestsEnabled() string {
 		return x.TestsEnabled
 	}
 	return ""
+}
+
+func (x *Account) GetMaxConcurrentConnections() int32 {
+	if x != nil {
+		return x.MaxConcurrentConnections
+	}
+	return 0
 }
 
 var File_proxy_vmess_account_proto protoreflect.FileDescriptor

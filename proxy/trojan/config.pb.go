@@ -26,7 +26,8 @@ type Account struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Password string `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	Password                 string `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	MaxConcurrentConnections int32  `protobuf:"varint,2,opt,name=max_concurrent_connections,json=maxConcurrentConnections,proto3" json:"max_concurrent_connections,omitempty"`
 }
 
 func (x *Account) Reset() {
@@ -64,6 +65,13 @@ func (x *Account) GetPassword() string {
 		return x.Password
 	}
 	return ""
+}
+
+func (x *Account) GetMaxConcurrentConnections() int32 {
+	if x != nil {
+		return x.MaxConcurrentConnections
+	}
+	return 0
 }
 
 type Fallback struct {

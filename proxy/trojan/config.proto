@@ -11,6 +11,10 @@ import "common/protocol/server_spec.proto";
 
 message Account {
   string password = 1;
+
+  // Maximum number of concurrent connections allowed for this user.
+  // 0 means unlimited (default).
+  int32 max_concurrent_connections = 2;
 }
 
 message Fallback {

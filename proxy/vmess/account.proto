@@ -16,4 +16,8 @@ message Account {
   xray.common.protocol.SecurityConfig security_settings = 3;
   // Define tests enabled for this account
   string tests_enabled = 4;
+
+  // Maximum number of concurrent connections allowed for this user.
+  // 0 means unlimited (default).
+  int32 max_concurrent_connections = 5;
 }

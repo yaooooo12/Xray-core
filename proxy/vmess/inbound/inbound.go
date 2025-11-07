@@ -275,6 +275,21 @@ func (h *Handler) Process(ctx context.Context, network net.Network, connection s
 	inbound.CanSpliceCopy = 3
 	inbound.User = request.User
 
+	// Check and enforce max concurrent connections limit
+	account := request.User.Account.(*vmess.MemoryAccount)
+	if !h.clients.IncrementConnection(request.User.Email, account.MaxConcurrentConnections) {
+		log.Record(&log.AccessMessage{
+			From:   connection.RemoteAddr(),
+			To:     request.Destination(),
+			Status: log.AccessRejected,
+			Reason: errors.New("max concurrent connections limit reached for user: ", request.User.Email),
+			Email:  request.User.Email,
+		})
+		return errors.New("max concurrent connections limit reached for user: ", request.User.Email).AtWarning()
+	}
+	// Ensure connection is decremented when this function returns
+	defer h.clients.DecrementConnection(request.User.Email)
+
 	sessionPolicy = h.policyManager.ForLevel(request.User.Level)
 
 	ctx, cancel := context.WithCancel(ctx)

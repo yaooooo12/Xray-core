@@ -73,12 +73,13 @@ type Account struct {
 	// ID of the account, in the form of a UUID, e.g., "66ad4540-b58c-4ad2-9926-ea63445a9b57".
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Flow settings. May be "xtls-rprx-vision".
-	Flow       string   `protobuf:"bytes,2,opt,name=flow,proto3" json:"flow,omitempty"`
-	Encryption string   `protobuf:"bytes,3,opt,name=encryption,proto3" json:"encryption,omitempty"`
-	XorMode    uint32   `protobuf:"varint,4,opt,name=xorMode,proto3" json:"xorMode,omitempty"`
-	Seconds    uint32   `protobuf:"varint,5,opt,name=seconds,proto3" json:"seconds,omitempty"`
-	Padding    string   `protobuf:"bytes,6,opt,name=padding,proto3" json:"padding,omitempty"`
-	Reverse    *Reverse `protobuf:"bytes,7,opt,name=reverse,proto3" json:"reverse,omitempty"`
+	Flow                     string   `protobuf:"bytes,2,opt,name=flow,proto3" json:"flow,omitempty"`
+	Encryption               string   `protobuf:"bytes,3,opt,name=encryption,proto3" json:"encryption,omitempty"`
+	XorMode                  uint32   `protobuf:"varint,4,opt,name=xorMode,proto3" json:"xorMode,omitempty"`
+	Seconds                  uint32   `protobuf:"varint,5,opt,name=seconds,proto3" json:"seconds,omitempty"`
+	Padding                  string   `protobuf:"bytes,6,opt,name=padding,proto3" json:"padding,omitempty"`
+	Reverse                  *Reverse `protobuf:"bytes,7,opt,name=reverse,proto3" json:"reverse,omitempty"`
+	MaxConcurrentConnections int32    `protobuf:"varint,8,opt,name=max_concurrent_connections,json=maxConcurrentConnections,proto3" json:"max_concurrent_connections,omitempty"`
 }
 
 func (x *Account) Reset() {
@@ -158,6 +159,13 @@ func (x *Account) GetReverse() *Reverse {
 		return x.Reverse
 	}
 	return nil
+}
+
+func (x *Account) GetMaxConcurrentConnections() int32 {
+	if x != nil {
+		return x.MaxConcurrentConnections
+	}
+	return 0
 }
 
 var File_proxy_vless_account_proto protoreflect.FileDescriptor
