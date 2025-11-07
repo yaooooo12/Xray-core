@@ -3,7 +3,6 @@ package ratelimit
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/xtls/xray-core/common/buf"
 	"golang.org/x/time/rate"
@@ -49,7 +48,7 @@ func (r *RateLimitedReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	if totalBytes > 0 {
 		// Wait for tokens from the rate limiter
 		ctx := context.Background()
-		waitErr := r.limiter.WaitN(ctx, totalBytes)
+		waitErr := r.limiter.WaitN(ctx, int(totalBytes))
 		if waitErr != nil {
 			buf.ReleaseMulti(mb)
 			return nil, waitErr
@@ -94,7 +93,7 @@ func (w *RateLimitedWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	if totalBytes > 0 {
 		// Wait for tokens from the rate limiter before writing
 		ctx := context.Background()
-		waitErr := w.limiter.WaitN(ctx, totalBytes)
+		waitErr := w.limiter.WaitN(ctx, int(totalBytes))
 		if waitErr != nil {
 			return waitErr
 		}
