@@ -17,12 +17,6 @@ type MemoryAccount struct {
 
 	// Maximum number of concurrent connections allowed for this user. 0 means unlimited.
 	MaxConcurrentConnections int32
-
-	// Maximum upload speed in bytes per second. 0 means unlimited.
-	MaxUploadSpeed int64
-
-	// Maximum download speed in bytes per second. 0 means unlimited.
-	MaxDownloadSpeed int64
 }
 
 // AsAccount implements protocol.AsAccount.
@@ -33,8 +27,6 @@ func (a *Account) AsAccount() (protocol.Account, error) {
 		Password:                 password,
 		Key:                      key,
 		MaxConcurrentConnections: a.MaxConcurrentConnections,
-		MaxUploadSpeed:           a.MaxUploadSpeed,
-		MaxDownloadSpeed:         a.MaxDownloadSpeed,
 	}, nil
 }
 
@@ -50,8 +42,6 @@ func (a *MemoryAccount) ToProto() proto.Message {
 	return &Account{
 		Password:                 a.Password,
 		MaxConcurrentConnections: a.MaxConcurrentConnections,
-		MaxUploadSpeed:           a.MaxUploadSpeed,
-		MaxDownloadSpeed:         a.MaxDownloadSpeed,
 	}
 }
 

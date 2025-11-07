@@ -15,14 +15,6 @@ message Account {
   // Maximum number of concurrent connections allowed for this user.
   // 0 means unlimited (default).
   int32 max_concurrent_connections = 2;
-
-  // Maximum upload speed in bytes per second.
-  // 0 means unlimited (default).
-  int64 max_upload_speed = 3;
-
-  // Maximum download speed in bytes per second.
-  // 0 means unlimited (default).
-  int64 max_download_speed = 4;
 }
 
 message Fallback {
