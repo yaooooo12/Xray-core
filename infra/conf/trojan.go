@@ -25,6 +25,8 @@ type TrojanServerTarget struct {
 	Password                 string   `json:"password"`
 	Flow                     string   `json:"flow"`
 	MaxConcurrentConnections int32    `json:"max_concurrent_connections"`
+	MaxUploadSpeed           int64    `json:"max_upload_speed"`
+	MaxDownloadSpeed         int64    `json:"max_download_speed"`
 }
 
 // TrojanClientConfig is configuration of trojan servers
@@ -36,6 +38,8 @@ type TrojanClientConfig struct {
 	Password                 string                `json:"password"`
 	Flow                     string                `json:"flow"`
 	MaxConcurrentConnections int32                 `json:"max_concurrent_connections"`
+	MaxUploadSpeed           int64                 `json:"max_upload_speed"`
+	MaxDownloadSpeed         int64                 `json:"max_download_speed"`
 	Servers                  []*TrojanServerTarget `json:"servers"`
 }
 
@@ -51,6 +55,8 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 				Password:                 c.Password,
 				Flow:                     c.Flow,
 				MaxConcurrentConnections: c.MaxConcurrentConnections,
+				MaxUploadSpeed:           c.MaxUploadSpeed,
+				MaxDownloadSpeed:         c.MaxDownloadSpeed,
 			},
 		}
 	}
@@ -83,6 +89,8 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 				Account: serial.ToTypedMessage(&trojan.Account{
 					Password:                 rec.Password,
 					MaxConcurrentConnections: rec.MaxConcurrentConnections,
+					MaxUploadSpeed:           rec.MaxUploadSpeed,
+					MaxDownloadSpeed:         rec.MaxDownloadSpeed,
 				}),
 			},
 		}
@@ -110,6 +118,8 @@ type TrojanUserConfig struct {
 	Email                    string `json:"email"`
 	Flow                     string `json:"flow"`
 	MaxConcurrentConnections int32  `json:"max_concurrent_connections"`
+	MaxUploadSpeed           int64  `json:"max_upload_speed"`
+	MaxDownloadSpeed         int64  `json:"max_download_speed"`
 }
 
 // TrojanServerConfig is Inbound configuration
@@ -135,6 +145,8 @@ func (c *TrojanServerConfig) Build() (proto.Message, error) {
 			Account: serial.ToTypedMessage(&trojan.Account{
 				Password:                 rawUser.Password,
 				MaxConcurrentConnections: rawUser.MaxConcurrentConnections,
+				MaxUploadSpeed:           rawUser.MaxUploadSpeed,
+				MaxDownloadSpeed:         rawUser.MaxDownloadSpeed,
 			}),
 		}
 	}
