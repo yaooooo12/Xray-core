@@ -251,6 +251,8 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 
 	errors.LogInfo(ctx, "DEBUG: Starting rate limit check for ", user.Email)
 
+	// TEMPORARILY DISABLE RATE LIMITING FOR TESTING
+	/*
 	// Apply rate limiting if configured
 	if destination.Network == net.Network_UDP {
 		errors.LogInfo(ctx, "DEBUG: UDP connection detected")
@@ -298,6 +300,12 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	}
 
 	errors.LogInfo(ctx, "DEBUG: Rate limiting setup complete")
+	*/
+
+	// Use normal connection without rate limiting
+	if destination.Network == net.Network_UDP {
+		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: conn}, dispatcher)
+	}
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
 		From:   conn.RemoteAddr(),
@@ -308,7 +316,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, reader, writer, dispatcher)
+	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(conn), dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {
