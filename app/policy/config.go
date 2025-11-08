@@ -58,6 +58,13 @@ func (p *Policy) overrideWith(another *Policy) {
 			Connection: another.Buffer.Connection,
 		}
 	}
+	if another.Limits != nil {
+		p.Limits = &Policy_Limits{
+			MaxConcurrentConnections: another.Limits.MaxConcurrentConnections,
+			MaxUploadSpeed:           another.Limits.MaxUploadSpeed,
+			MaxDownloadSpeed:         another.Limits.MaxDownloadSpeed,
+		}
+	}
 }
 
 // ToCorePolicy converts this Policy to policy.Session.
@@ -77,6 +84,12 @@ func (p *Policy) ToCorePolicy() policy.Session {
 	}
 	if p.Buffer != nil {
 		cp.Buffer.PerConnection = p.Buffer.Connection
+	}
+	if p.Limits != nil {
+		cp.Limits.MaxConcurrentConnections = p.Limits.MaxConcurrentConnections
+		// Convert KB/s to bytes/s
+		cp.Limits.MaxUploadSpeed = p.Limits.MaxUploadSpeed * 1024
+		cp.Limits.MaxDownloadSpeed = p.Limits.MaxDownloadSpeed * 1024
 	}
 	return cp
 }

@@ -30,9 +30,22 @@ message Policy {
     int32 connection = 1;
   }
 
+  message Limits {
+    // Maximum number of concurrent connections for users at this level.
+    // 0 means unlimited (default).
+    int32 max_concurrent_connections = 1;
+    // Maximum upload speed in KB/s (kilobytes per second) for users at this level.
+    // 0 means unlimited (default).
+    int64 max_upload_speed = 2;
+    // Maximum download speed in KB/s (kilobytes per second) for users at this level.
+    // 0 means unlimited (default).
+    int64 max_download_speed = 3;
+  }
+
   Timeout timeout = 1;
   Stats stats = 2;
   Buffer buffer = 3;
+  Limits limits = 4;
 }
 
 message SystemPolicy {

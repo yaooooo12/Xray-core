@@ -37,6 +37,16 @@ type Buffer struct {
 	PerConnection int32
 }
 
+// Limits contains connection and bandwidth limits.
+type Limits struct {
+	// Maximum number of concurrent connections. 0 means unlimited.
+	MaxConcurrentConnections int32
+	// Maximum upload speed in bytes per second. 0 means unlimited.
+	MaxUploadSpeed int64
+	// Maximum download speed in bytes per second. 0 means unlimited.
+	MaxDownloadSpeed int64
+}
+
 // SystemStats contains stat policy settings on system level.
 type SystemStats struct {
 	// Whether or not to enable stat counter for uplink traffic in inbound handlers.
@@ -60,6 +70,7 @@ type Session struct {
 	Timeouts Timeout // Timeout settings
 	Stats    Stats
 	Buffer   Buffer
+	Limits   Limits
 }
 
 // Manager is a feature that provides Policy for the given user by its id or level.

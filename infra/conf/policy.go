@@ -5,14 +5,17 @@ import (
 )
 
 type Policy struct {
-	Handshake         *uint32 `json:"handshake"`
-	ConnectionIdle    *uint32 `json:"connIdle"`
-	UplinkOnly        *uint32 `json:"uplinkOnly"`
-	DownlinkOnly      *uint32 `json:"downlinkOnly"`
-	StatsUserUplink   bool    `json:"statsUserUplink"`
-	StatsUserDownlink bool    `json:"statsUserDownlink"`
-	StatsUserOnline   bool    `json:"statsUserOnline"`
-	BufferSize        *int32  `json:"bufferSize"`
+	Handshake                *uint32 `json:"handshake"`
+	ConnectionIdle           *uint32 `json:"connIdle"`
+	UplinkOnly               *uint32 `json:"uplinkOnly"`
+	DownlinkOnly             *uint32 `json:"downlinkOnly"`
+	StatsUserUplink          bool    `json:"statsUserUplink"`
+	StatsUserDownlink        bool    `json:"statsUserDownlink"`
+	StatsUserOnline          bool    `json:"statsUserOnline"`
+	BufferSize               *int32  `json:"bufferSize"`
+	MaxConcurrentConnections *int32  `json:"maxConcurrentConnections"`
+	MaxUploadSpeed           *int64  `json:"maxUploadSpeed"`   // In KB/s
+	MaxDownloadSpeed         *int64  `json:"maxDownloadSpeed"` // In KB/s
 }
 
 func (t *Policy) Build() (*policy.Policy, error) {
@@ -47,6 +50,20 @@ func (t *Policy) Build() (*policy.Policy, error) {
 		p.Buffer = &policy.Policy_Buffer{
 			Connection: bs,
 		}
+	}
+
+	if t.MaxConcurrentConnections != nil || t.MaxUploadSpeed != nil || t.MaxDownloadSpeed != nil {
+		limits := &policy.Policy_Limits{}
+		if t.MaxConcurrentConnections != nil {
+			limits.MaxConcurrentConnections = *t.MaxConcurrentConnections
+		}
+		if t.MaxUploadSpeed != nil {
+			limits.MaxUploadSpeed = *t.MaxUploadSpeed
+		}
+		if t.MaxDownloadSpeed != nil {
+			limits.MaxDownloadSpeed = *t.MaxDownloadSpeed
+		}
+		p.Limits = limits
 	}
 
 	return p, nil
