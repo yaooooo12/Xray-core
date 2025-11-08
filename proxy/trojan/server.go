@@ -249,30 +249,55 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Ensure connection is decremented when this function returns
 	defer s.validator.DecrementConnection(user.Email)
 
+	errors.LogInfo(ctx, "DEBUG: Starting rate limit check for ", user.Email)
+
 	// Apply rate limiting if configured
 	if destination.Network == net.Network_UDP {
+		errors.LogInfo(ctx, "DEBUG: UDP connection detected")
 		// For UDP, wrap the connection
 		var writer io.Writer = conn
 		if account.MaxUploadSpeed > 0 || account.MaxDownloadSpeed > 0 {
-			writer = newRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
-			errors.LogInfo(ctx, "Applied rate limiting for UDP: upload=", account.MaxUploadSpeed, " download=", account.MaxDownloadSpeed)
+			errors.LogInfo(ctx, "DEBUG: Creating rate-limited conn for UDP")
+			rateLimited := newRateLimitedConn(conn, account.MaxUploadSpeed, account.MaxDownloadSpeed)
+			if rateLimited != nil {
+				writer = rateLimited
+				errors.LogInfo(ctx, "Applied rate limiting for UDP: upload=", account.MaxUploadSpeed, " download=", account.MaxDownloadSpeed)
+			} else {
+				errors.LogInfo(ctx, "WARNING: Failed to create rate-limited connection, using normal connection")
+			}
 		}
 		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: writer}, dispatcher)
 	}
+
+	errors.LogInfo(ctx, "DEBUG: TCP connection detected")
 
 	// For TCP, wrap the reader and writer
 	var reader buf.Reader = clientReader
 	var writer buf.Writer = buf.NewWriter(conn)
 
 	if account.MaxUploadSpeed > 0 {
-		reader = newRateLimitedReader(reader, account.MaxUploadSpeed)
-		errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s")
+		errors.LogInfo(ctx, "DEBUG: Creating rate-limited reader for upload")
+		rateLimitedReader := newRateLimitedReader(reader, account.MaxUploadSpeed)
+		if rateLimitedReader != nil {
+			reader = rateLimitedReader
+			errors.LogInfo(ctx, "Applied upload rate limit: ", account.MaxUploadSpeed, " bytes/s")
+		} else {
+			errors.LogInfo(ctx, "WARNING: Failed to create rate-limited reader")
+		}
 	}
 
 	if account.MaxDownloadSpeed > 0 {
-		writer = newRateLimitedWriter(writer, account.MaxDownloadSpeed)
-		errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s")
+		errors.LogInfo(ctx, "DEBUG: Creating rate-limited writer for download")
+		rateLimitedWriter := newRateLimitedWriter(writer, account.MaxDownloadSpeed)
+		if rateLimitedWriter != nil {
+			writer = rateLimitedWriter
+			errors.LogInfo(ctx, "Applied download rate limit: ", account.MaxDownloadSpeed, " bytes/s")
+		} else {
+			errors.LogInfo(ctx, "WARNING: Failed to create rate-limited writer")
+		}
 	}
+
+	errors.LogInfo(ctx, "DEBUG: Rate limiting setup complete")
 
 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
 		From:   conn.RemoteAddr(),
