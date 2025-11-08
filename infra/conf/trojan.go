@@ -25,8 +25,8 @@ type TrojanServerTarget struct {
 	Password                 string   `json:"password"`
 	Flow                     string   `json:"flow"`
 	MaxConcurrentConnections int32    `json:"max_concurrent_connections"`
-	MaxUploadSpeed           int64    `json:"max_upload_speed"`
-	MaxDownloadSpeed         int64    `json:"max_download_speed"`
+	MaxUploadSpeed           int64    `json:"max_upload_speed"`   // In KB/s (kilobytes per second)
+	MaxDownloadSpeed         int64    `json:"max_download_speed"` // In KB/s (kilobytes per second)
 }
 
 // TrojanClientConfig is configuration of trojan servers
@@ -38,8 +38,8 @@ type TrojanClientConfig struct {
 	Password                 string                `json:"password"`
 	Flow                     string                `json:"flow"`
 	MaxConcurrentConnections int32                 `json:"max_concurrent_connections"`
-	MaxUploadSpeed           int64                 `json:"max_upload_speed"`
-	MaxDownloadSpeed         int64                 `json:"max_download_speed"`
+	MaxUploadSpeed           int64                 `json:"max_upload_speed"`   // In KB/s (kilobytes per second)
+	MaxDownloadSpeed         int64                 `json:"max_download_speed"` // In KB/s (kilobytes per second)
 	Servers                  []*TrojanServerTarget `json:"servers"`
 }
 
@@ -89,8 +89,8 @@ func (c *TrojanClientConfig) Build() (proto.Message, error) {
 				Account: serial.ToTypedMessage(&trojan.Account{
 					Password:                 rec.Password,
 					MaxConcurrentConnections: rec.MaxConcurrentConnections,
-					MaxUploadSpeed:           rec.MaxUploadSpeed,
-					MaxDownloadSpeed:         rec.MaxDownloadSpeed,
+					MaxUploadSpeed:           rec.MaxUploadSpeed * 1024,   // Convert KB/s to bytes/s
+					MaxDownloadSpeed:         rec.MaxDownloadSpeed * 1024, // Convert KB/s to bytes/s
 				}),
 			},
 		}
@@ -118,8 +118,8 @@ type TrojanUserConfig struct {
 	Email                    string `json:"email"`
 	Flow                     string `json:"flow"`
 	MaxConcurrentConnections int32  `json:"max_concurrent_connections"`
-	MaxUploadSpeed           int64  `json:"max_upload_speed"`
-	MaxDownloadSpeed         int64  `json:"max_download_speed"`
+	MaxUploadSpeed           int64  `json:"max_upload_speed"`   // In KB/s (kilobytes per second)
+	MaxDownloadSpeed         int64  `json:"max_download_speed"` // In KB/s (kilobytes per second)
 }
 
 // TrojanServerConfig is Inbound configuration
@@ -145,8 +145,8 @@ func (c *TrojanServerConfig) Build() (proto.Message, error) {
 			Account: serial.ToTypedMessage(&trojan.Account{
 				Password:                 rawUser.Password,
 				MaxConcurrentConnections: rawUser.MaxConcurrentConnections,
-				MaxUploadSpeed:           rawUser.MaxUploadSpeed,
-				MaxDownloadSpeed:         rawUser.MaxDownloadSpeed,
+				MaxUploadSpeed:           rawUser.MaxUploadSpeed * 1024,   // Convert KB/s to bytes/s
+				MaxDownloadSpeed:         rawUser.MaxDownloadSpeed * 1024, // Convert KB/s to bytes/s
 			}),
 		}
 	}
