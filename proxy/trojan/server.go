@@ -14,6 +14,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	udp_proto "github.com/xtls/xray-core/common/protocol/udp"
+	"github.com/xtls/xray-core/common/ratelimit"
 	"github.com/xtls/xray-core/common/retry"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal"
@@ -232,6 +233,23 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	inbound.User = user
 	sessionPolicy = s.policyManager.ForLevel(user.Level)
 
+	// Enforce concurrent connection limit
+	if sessionPolicy.Limits.MaxConcurrentConnections > 0 {
+		if !s.policyManager.IncrementConnection(user.Email, sessionPolicy.Limits.MaxConcurrentConnections) {
+			err := errors.New("max concurrent connections limit reached for user: ", user.Email)
+			log.Record(&log.AccessMessage{
+				From:   conn.RemoteAddr(),
+				To:     destination,
+				Status: log.AccessRejected,
+				Reason: err,
+				Email:  user.Email,
+			})
+			return err.AtWarning()
+		}
+		defer s.policyManager.DecrementConnection(user.Email)
+		errors.LogInfo(ctx, "Connection accepted for ", user.Email, " (limit: ", sessionPolicy.Limits.MaxConcurrentConnections, ")")
+	}
+
 	if destination.Network == net.Network_UDP { // handle udp request
 		return s.handleUDPPayload(ctx, sessionPolicy, &PacketReader{Reader: clientReader}, &PacketWriter{Writer: conn}, dispatcher)
 	}
@@ -245,7 +263,22 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	})
 
 	errors.LogInfo(ctx, "received request for ", destination)
-	return s.handleConnection(ctx, sessionPolicy, destination, clientReader, buf.NewWriter(conn), dispatcher)
+
+	// Apply bandwidth limits if configured
+	reader := buf.Reader(clientReader)
+	writer := buf.Writer(buf.NewWriter(conn))
+
+	if sessionPolicy.Limits.MaxUploadSpeed > 0 {
+		reader = ratelimit.NewReader(reader, sessionPolicy.Limits.MaxUploadSpeed)
+		errors.LogInfo(ctx, "Applied upload rate limit: ", sessionPolicy.Limits.MaxUploadSpeed, " bytes/s")
+	}
+
+	if sessionPolicy.Limits.MaxDownloadSpeed > 0 {
+		writer = ratelimit.NewWriter(writer, sessionPolicy.Limits.MaxDownloadSpeed)
+		errors.LogInfo(ctx, "Applied download rate limit: ", sessionPolicy.Limits.MaxDownloadSpeed, " bytes/s")
+	}
+
+	return s.handleConnection(ctx, sessionPolicy, destination, reader, writer, dispatcher)
 }
 
 func (s *Server) handleUDPPayload(ctx context.Context, sessionPolicy policy.Session, clientReader *PacketReader, clientWriter *PacketWriter, dispatcher routing.Dispatcher) error {

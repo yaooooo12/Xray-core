@@ -84,6 +84,13 @@ type Manager interface {
 
 	// ForSystem returns the System policy for Xray system.
 	ForSystem() System
+
+	// IncrementConnection increments the connection count for a user.
+	// Returns true if allowed, false if limit reached.
+	IncrementConnection(userEmail string, maxConnections int32) bool
+
+	// DecrementConnection decrements the connection count for a user.
+	DecrementConnection(userEmail string)
 }
 
 // ManagerType returns the type of Manager interface. Can be used to implement common.HasType.
