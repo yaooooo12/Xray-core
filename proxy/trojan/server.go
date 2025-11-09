@@ -236,7 +236,7 @@ func (s *Server) Process(ctx context.Context, network net.Network, conn stat.Con
 	// Enforce concurrent connection limit
 	if sessionPolicy.Limits.MaxConcurrentConnections > 0 {
 		if !s.policyManager.IncrementConnection(user.Email, sessionPolicy.Limits.MaxConcurrentConnections) {
-			err := errors.New("max concurrent connections limit reached for user: ", user.Email)
+			err := errors.New("MAX_CONN_LIMIT_REACHED: ", user.Email)
 			log.Record(&log.AccessMessage{
 				From:   conn.RemoteAddr(),
 				To:     destination,
